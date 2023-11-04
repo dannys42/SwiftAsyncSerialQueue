@@ -8,6 +8,8 @@
 import Foundation
 import os
 
+/// ``AsyncSerialQueue`` provides behavior similar to serial `DispatchQueue`s while relying solely on Swift concurrency.
+/// In other words, queued async blocks are guaranteed to execute in-order.
 public class AsyncSerialQueue {
     public enum State {
         case setup
@@ -53,16 +55,17 @@ public class AsyncSerialQueue {
     deinit {
         self.continuation!.finish()
     }
-
-    public func async(_ closure: @escaping closure) {
-        self.async(closure, completion: { })
-    }
-
-    public func async(_ closure: @escaping closure, completion: @escaping ()->Void) {
+    
+    /// Add a block to the queue
+    /// - Parameter closure: Block to execute
+    /// - Parameter completion: An optional completion handler will be executed after the `closure` is called.
+    /// If the ``AsyncSerialQueue`` is cancelled, the `completion` will immediately execute and the `closure` will not be queued.
+    public func async(_ closure: @escaping closure, completion: @escaping ()->Void = { }) {
         // TODO: Is it possible for continuation to not be ready here?
         guard !self.executor.isCancelled else {
             completion()
-            return }
+            return
+        }
 
         self.continuation!.yield {
             await closure()
@@ -70,6 +73,26 @@ public class AsyncSerialQueue {
         }
     }
 
+    /// Add a block to the queue
+    /// - Parameter closure: Block to execute
+    /// - Parameter completion: An optional completion handler will be executed after the `closure` is called.
+    /// If the ``AsyncSerialQueue`` is cancelled, the `completion` will immediately execute and the `closure` will not be queued.
+    public func async(_ closure: @escaping closure, completion: @escaping () async -> Void = { }) async {
+        // TODO: Is it possible for continuation to not be ready here?
+        guard !self.executor.isCancelled else {
+            await completion()
+            return
+        }
+
+        self.continuation!.yield {
+            await closure()
+            await completion()
+        }
+    }
+
+    
+    /// Cancel all queued blocks and prevent additional blocks from being queued.
+    /// - Parameter newCompletion: An optional completion handler will be called after all blocks have been cancelled and finished executing.
     public func cancel(_ newCompletion: @Sendable @escaping ()->Void = { }) {
         self.executor.cancel()
         self.continuation?.finish()
@@ -78,6 +101,8 @@ public class AsyncSerialQueue {
         }
     }
 
+    /// Cancel all queued blocks and prevent additional blocks from being queued.
+    /// This method will return after all blocks have been cancelled and finished executing.
     public func cancel() async {
         await withCheckedContinuation { continuation in
             self.cancel {
@@ -86,7 +111,9 @@ public class AsyncSerialQueue {
         }
     }
 
-
+    
+    /// Queue a block, returning only after it has executed
+    /// - Parameter closure: block to queue
     public func sync(_ closure: @escaping closure) async {
         await withCheckedContinuation { continuation in
             self.async {
@@ -96,7 +123,8 @@ public class AsyncSerialQueue {
             }
         }
     }
-
+    
+    /// Wait until all queued blocks have finished executing
     public func wait() async {
         await self.sync({})
     }
