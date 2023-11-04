@@ -7,8 +7,8 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
     override func setUp() async throws {
         self.dataHelper.clear()
     }
-
-    func testThat_Tasks_WillBeNotOrdered() async throws {
+    
+    func testThat_NormalTasks_WillBeNotOrdered() async throws {
         let numberOfIterations = 200
         let expectedValue: [Int] = .sequence(numberOfIterations)
 
@@ -24,8 +24,8 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
         let observedValue = self.dataHelper.values()
         XCTAssertNotEqual(observedValue, expectedValue)
     }
-
-    func testThat_Tasks_WillBeOrdered() async throws {
+    
+    func testThat_TasksInAsyncSerialQueue_WillBeOrdered() async throws {
         let numberOfIterations = 200
         let expectedValue: [Int] = .sequence(numberOfIterations)
 
@@ -41,5 +41,26 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
 
         let observedValue = self.dataHelper.values()
         XCTAssertEqual(observedValue, expectedValue)
+    }
+
+
+    func testThat_CancelledQueue_WillNoLongerExecute() async throws {
+        let serialQueue = AsyncSerialQueue()
+
+        serialQueue.async {
+            try? await Task.sleep(for: .seconds(3))
+        }
+        await serialQueue.cancel()
+        serialQueue.async {
+            self.dataHelper.append(1)
+        }
+
+        await serialQueue.wait()
+
+        let observedValue = self.dataHelper.values()
+
+        XCTAssertTrue(observedValue.isEmpty)
+        XCTAssertEqual(serialQueue.state, .stopped)
+
     }
 }

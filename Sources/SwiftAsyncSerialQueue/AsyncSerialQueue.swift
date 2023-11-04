@@ -15,19 +15,25 @@ public class AsyncSerialQueue {
         case stopped
     }
     public typealias closure = @Sendable () async -> Void
-    public private(set) var state: OSAllocatedUnfairLock<State>
+    public var state: State {
+        _state.withLock { $0 }
+    }
 
+    private var _state: OSAllocatedUnfairLock<State>
     private var taskStream: AsyncStream<closure>!
     private var continuation: AsyncStream<closure>.Continuation?
     private var executor: Task<(), Never>!
 
+    private var cancelBlockList: BlockCollection
+
     public init() {
-        self.state = .init(initialState: .setup)
+        self._state = .init(initialState: .setup)
+        self.cancelBlockList = BlockCollection()
 
         self.taskStream = AsyncStream<closure>(bufferingPolicy: .unbounded) { continuation in
             self.continuation = continuation
 
-            self.state.withLock { state in
+            self._state.withLock { state in
                 state = .running
             }
         }
@@ -36,9 +42,11 @@ public class AsyncSerialQueue {
                 await closure()
             }
 
-            self.state.withLock { state in
+            self._state.withLock { state in
                 state = .stopped
             }
+
+            await self.cancelBlockList.execute()
         }
     }
 
@@ -47,14 +55,35 @@ public class AsyncSerialQueue {
     }
 
     public func async(_ closure: @escaping closure) {
-        // TODO: continuation may not be ready yet... we should fall back to storing the closures until the continuation is ready
+        self.async(closure, completion: { })
+    }
+
+    public func async(_ closure: @escaping closure, completion: @escaping ()->Void) {
+        // TODO: Is it possible for continuation to not be ready here?
+        guard !self.executor.isCancelled else {
+            completion()
+            return }
+
         self.continuation!.yield {
             await closure()
+            completion()
         }
     }
 
-    public func cancel() {
+    public func cancel(_ newCompletion: @Sendable @escaping ()->Void = { }) {
         self.executor.cancel()
+        self.continuation?.finish()
+        Task {
+            await self.cancelBlockList.add(newCompletion)
+        }
+    }
+
+    public func cancel() async {
+        await withCheckedContinuation { continuation in
+            self.cancel {
+                continuation.resume()
+            }
+        }
     }
 
 
@@ -62,6 +91,7 @@ public class AsyncSerialQueue {
         await withCheckedContinuation { continuation in
             self.async {
                 await closure()
+            } completion: {
                 continuation.resume()
             }
         }
