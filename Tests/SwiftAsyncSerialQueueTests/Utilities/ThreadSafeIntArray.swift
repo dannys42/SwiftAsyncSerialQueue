@@ -1,5 +1,5 @@
 //
-//  DataHelper.swift
+//  ThreadSafeIntArray.swift
 //
 //
 //  Created by Danny Sung on 11/3/23.
@@ -9,7 +9,7 @@ import Foundation
 import os
 
 /// A thread-safe helper class to add elements to an array
-class DataHelper: @unchecked Sendable {
+class ThreadSafeIntArray: @unchecked Sendable {
     var someArray = OSAllocatedUnfairLock<[Int]>(initialState: [])
 
     func append(_ value: Int) {

@@ -73,31 +73,17 @@ public class AsyncSerialQueue {
         }
     }
 
-    /// Add a block to the queue
-    /// - Parameter closure: Block to execute
-    /// - Parameter completion: An optional completion handler will be executed after the `closure` is called.
-    /// If the ``AsyncSerialQueue`` is cancelled, the `completion` will immediately execute and the `closure` will not be queued.
-    public func async(_ closure: @escaping closure, completion: @escaping () async -> Void = { }) async {
-        // TODO: Is it possible for continuation to not be ready here?
-        guard !self.executor.isCancelled else {
-            await completion()
-            return
-        }
-
-        self.continuation!.yield {
-            await closure()
-            await completion()
-        }
-    }
-
-    
     /// Cancel all queued blocks and prevent additional blocks from being queued.
     /// - Parameter newCompletion: An optional completion handler will be called after all blocks have been cancelled and finished executing.
     public func cancel(_ newCompletion: @Sendable @escaping ()->Void = { }) {
         self.executor.cancel()
         self.continuation?.finish()
-        Task {
-            await self.cancelBlockList.add(newCompletion)
+        if self.executor.isCancelled {
+            newCompletion()
+        } else {
+            Task {
+                await self.cancelBlockList.add(newCompletion)
+            }
         }
     }
 
@@ -109,6 +95,8 @@ public class AsyncSerialQueue {
                 continuation.resume()
             }
         }
+        self.executor.cancel()
+        self.continuation?.finish()
     }
 
     

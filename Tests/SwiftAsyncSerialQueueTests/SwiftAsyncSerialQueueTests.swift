@@ -2,7 +2,7 @@ import XCTest
 @testable import SwiftAsyncSerialQueue
 
 final class SwiftAsyncSerialQueueTests: XCTestCase {
-    fileprivate var dataHelper = DataHelper()
+    fileprivate var dataHelper = ThreadSafeIntArray()
 
     override func setUp() async throws {
         self.dataHelper.clear()
@@ -41,6 +41,32 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
 
         let observedValue = self.dataHelper.values()
         XCTAssertEqual(observedValue, expectedValue)
+    }
+
+
+    func testThat_CancelCompletionHandler_WillExecute_AfterQueuedBlock() async throws {
+        let serialQueue = AsyncSerialQueue()
+        serialQueue.async {
+            try? await Task.sleep(for: .seconds(2))
+        }
+
+        let expectation = XCTestExpectation(description: "cancel completion handler")
+        serialQueue.cancel {
+            expectation.fulfill()
+        }
+
+        await fulfillment(of: [expectation])
+    }
+
+    func testThat_CancelCompletionHandler_WillExecute_WithNoQueuedBlock() async throws {
+        let serialQueue = AsyncSerialQueue()
+
+        let expectation = XCTestExpectation(description: "cancel completion handler")
+        serialQueue.cancel() {
+            expectation.fulfill()
+        }
+
+        await fulfillment(of: [expectation], timeout: 2.0)
     }
 
 
