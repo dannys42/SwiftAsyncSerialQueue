@@ -14,6 +14,7 @@ public class AsyncSerialQueue {
     public enum State {
         case setup
         case running
+        case stopping
         case stopped
     }
     public typealias closure = @Sendable () async -> Void
@@ -76,6 +77,9 @@ public class AsyncSerialQueue {
     /// Cancel all queued blocks and prevent additional blocks from being queued.
     /// - Parameter newCompletion: An optional completion handler will be called after all blocks have been cancelled and finished executing.
     public func cancel(_ newCompletion: @Sendable @escaping ()->Void = { }) {
+        self._state.withLock { state in
+            state = .stopping
+        }
         self.executor.cancel()
         self.continuation?.finish()
         if self.executor.isCancelled {
@@ -115,5 +119,13 @@ public class AsyncSerialQueue {
     /// Wait until all queued blocks have finished executing
     public func wait() async {
         await self.sync({})
+
+        // If we were in the middle of cancelling, try to wait a bit until cancel has completed
+        let maxIterations = 25
+        var iteration = 0
+        while self.state == .stopping && iteration < maxIterations {
+            try? await Task.sleep(for: .microseconds(10))
+            iteration += 1
+        }
     }
 }

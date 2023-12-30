@@ -9,16 +9,16 @@ let package = Package(
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
-            name: "SwiftAsyncSerialQueue",
-            targets: ["SwiftAsyncSerialQueue"]),
+            name: "AsyncSerialQueue",
+            targets: ["AsyncSerialQueue"]),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "SwiftAsyncSerialQueue"),
+            name: "AsyncSerialQueue"),
         .testTarget(
-            name: "SwiftAsyncSerialQueueTests",
-            dependencies: ["SwiftAsyncSerialQueue"]),
+            name: "AsyncSerialQueueTests",
+            dependencies: ["AsyncSerialQueue"]),
     ]
 )

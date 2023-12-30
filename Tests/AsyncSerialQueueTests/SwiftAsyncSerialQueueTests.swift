@@ -1,5 +1,5 @@
 import XCTest
-@testable import SwiftAsyncSerialQueue
+@testable import AsyncSerialQueue
 
 final class SwiftAsyncSerialQueueTests: XCTestCase {
     fileprivate var dataHelper = ThreadSafeIntArray()
@@ -87,6 +87,5 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
 
         XCTAssertTrue(observedValue.isEmpty)
         XCTAssertEqual(serialQueue.state, .stopped)
-
     }
 }

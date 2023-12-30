@@ -6,7 +6,7 @@
 //
 
 import XCTest
-import SwiftAsyncSerialQueue
+import AsyncSerialQueue
 
 final class ReentrancyTests: XCTestCase {
     
