@@ -88,4 +88,44 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
         XCTAssertTrue(observedValue.isEmpty)
         XCTAssertEqual(serialQueue.state, .stopped)
     }
+
+    func testThat_ThrowingAsync_WillPassErrorToCompletion() async throws {
+        let expectedError = NSError(domain: "test.domain", code: -1234)
+
+        let serialQueue = AsyncSerialQueue()
+        let expectation = XCTestExpectation(description: "serialQueue completion handler must be called once")
+
+        serialQueue.async {
+            throw expectedError
+        } completion: { result in
+            switch result {
+            case .success:
+                XCTFail("Error is expected!")
+            case .failure(let error):
+                XCTAssertEqual(error as NSError, expectedError)
+            }
+            expectation.fulfill()
+        }
+
+        await serialQueue.wait()
+        await fulfillment(of: [expectation], timeout: 3)
+    }
+
+    func testThat_ThrowingSync_WillThrowError() async throws {
+        let expectedError = NSError(domain: "test.domain", code: -1234)
+
+        let serialQueue = AsyncSerialQueue()
+        let expectation = XCTestExpectation(description: "serialQueue completion handler must be called once")
+
+        do {
+            try await serialQueue.sync {
+                throw expectedError
+            }
+        } catch {
+            XCTAssertEqual(error as NSError, expectedError)
+            expectation.fulfill()
+        }
+
+        await fulfillment(of: [expectation], timeout: 3)
+    }
 }

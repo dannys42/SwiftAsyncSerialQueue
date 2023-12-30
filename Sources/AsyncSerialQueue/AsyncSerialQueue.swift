@@ -17,7 +17,13 @@ public class AsyncSerialQueue {
         case stopping
         case stopped
     }
+    public enum Failures: LocalizedError {
+        case cancelled
+    }
+
     public typealias closure = @Sendable () async -> Void
+    public typealias throwingClosure<T> = @Sendable () async throws -> T
+    public typealias returningClosure<T> = @Sendable () async -> T
     public var state: State {
         _state.withLock { $0 }
     }
@@ -61,18 +67,63 @@ public class AsyncSerialQueue {
     /// - Parameter closure: Block to execute
     /// - Parameter completion: An optional completion handler will be executed after the `closure` is called.
     /// If the ``AsyncSerialQueue`` is cancelled, the `completion` will immediately execute and the `closure` will not be queued.
-    public func async(_ closure: @escaping closure, completion: @escaping ()->Void = { }) {
+    public func async(_ closure: @escaping closure, completion: @escaping (Error?)->Void) {
+        self.async(closure) { result in
+            switch result {
+            case .success:
+                completion(nil)
+            case .failure(let error):
+                completion(error)
+            }
+        }
+    }
+
+    /// Add a block to the queue
+    /// - Parameter closure: Block to execute
+    /// - Parameter completion: An optional completion handler will be executed after the `closure` is called.
+    /// If the ``AsyncSerialQueue`` is cancelled, the `completion` will immediately execute and the `closure` will not be queued.
+    public func async<T>(_ closure: @escaping returningClosure<T>, completion: @escaping (Result<T, Error>)->Void) {
         // TODO: Is it possible for continuation to not be ready here?
         guard !self.executor.isCancelled else {
-            completion()
+            completion(.failure(Failures.cancelled))
             return
         }
 
         self.continuation!.yield {
-            await closure()
-            completion()
+            let returnValue = await closure()
+            completion(.success(returnValue))
         }
     }
+
+    public func async<T>(_ closure: @escaping returningClosure<T>) {
+        self.async(closure, completion: { _ in })
+    }
+
+    /// Add a block to the queue
+    /// - Parameter closure: Block to execute
+    /// - Parameter completion: An optional completion handler will be executed after the `closure` is called.
+    /// If the ``AsyncSerialQueue`` is cancelled, the `completion` will immediately execute and the `closure` will not be queued.
+    public func async<T>(_ closure: @escaping throwingClosure<T>, completion: @escaping (Result<T, Error>)->Void) {
+        // TODO: Is it possible for continuation to not be ready here?
+        guard !self.executor.isCancelled else {
+            completion(.failure(Failures.cancelled))
+            return
+        }
+
+        self.continuation!.yield {
+            do {
+                let returnValue = try await closure()
+                completion(.success(returnValue))
+            } catch {
+                completion(.failure(error))
+            }
+        }
+    }
+
+    public func async<T>(_ closure: @escaping throwingClosure<T>) {
+        self.async(closure, completion: { _ in })
+    }
+
 
     /// Cancel all queued blocks and prevent additional blocks from being queued.
     /// - Parameter newCompletion: An optional completion handler will be called after all blocks have been cancelled and finished executing.
@@ -106,19 +157,32 @@ public class AsyncSerialQueue {
     
     /// Queue a block, returning only after it has executed
     /// - Parameter closure: block to queue
-    public func sync(_ closure: @escaping closure) async {
-        await withCheckedContinuation { continuation in
+    public func sync<T>(_ closure: @escaping throwingClosure<T>) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
             self.async {
-                await closure()
-            } completion: {
-                continuation.resume()
+                return try await closure()
+            } completion: { result in
+                continuation.resume(with: result)
             }
         }
     }
     
+    /// Queue a block, returning only after it has executed
+    /// - Parameter closure: block to queue
+    public func sync<T>(_ closure: @escaping returningClosure<T>) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            self.async {
+                return await closure()
+            } completion: { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+
+
     /// Wait until all queued blocks have finished executing
     public func wait() async {
-        await self.sync({})
+        try? await self.sync({})
 
         // If we were in the middle of cancelling, try to wait a bit until cancel has completed
         let maxIterations = 25
