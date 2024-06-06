@@ -117,15 +117,22 @@ public class AsyncSerialQueue {
     }
     
     /// Wait until all queued blocks have finished executing
-    public func wait() async {
+    @discardableResult
+    public func wait<C>(for duration: C.Instant.Duration?=nil, tolerance: C.Instant.Duration? = nil, clock: C = ContinuousClock()) async -> State where C : Clock {
         await self.sync({})
 
         // If we were in the middle of cancelling, try to wait a bit until cancel has completed
-        let maxIterations = 25
-        var iteration = 0
-        while self.state == .stopping && iteration < maxIterations {
+        let startTime = clock.now
+        while self.state == .stopping {
             try? await Task.sleep(for: .microseconds(10))
-            iteration += 1
+            
+            if let duration {
+                if startTime.duration(to: clock.now) > duration {
+                    break
+                }
+            }
         }
+        
+        return self.state
     }
 }
