@@ -10,8 +10,8 @@ import os
 
 /// ``AsyncSerialQueue`` provides behavior similar to serial `DispatchQueue`s while relying solely on Swift concurrency.
 /// In other words, queued async blocks are guaranteed to execute in-order.
-public class AsyncSerialQueue {
-    public enum State {
+public final class AsyncSerialQueue: @unchecked Sendable {
+    public enum State: Sendable {
         case setup
         case running
         case stopping
@@ -61,7 +61,7 @@ public class AsyncSerialQueue {
     /// - Parameter closure: Block to execute
     /// - Parameter completion: An optional completion handler will be executed after the `closure` is called.
     /// If the ``AsyncSerialQueue`` is cancelled, the `completion` will immediately execute and the `closure` will not be queued.
-    public func async(_ closure: @escaping closure, completion: @escaping ()->Void = { }) {
+    public func async(_ closure: @escaping closure, completion: @Sendable @escaping ()->Void = { }) {
         // TODO: Is it possible for continuation to not be ready here?
         guard !self.executor.isCancelled else {
             completion()
