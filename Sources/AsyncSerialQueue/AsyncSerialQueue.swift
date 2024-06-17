@@ -38,12 +38,10 @@ public final class AsyncSerialQueue: @unchecked Sendable {
     private var executor: Task<(), Never>!
     private var currentRunningTask: Task<(), Never>?
     
-    private var cancelBlockList: BlockCollection
     private let taskPriority: TaskPriority?
     
     public init(priority: TaskPriority?=nil) {
         self._state = .init(initialState: .setup)
-        self.cancelBlockList = BlockCollection()
         self.taskPriority = priority
         
         self.taskStream = AsyncStream<closure>(bufferingPolicy: .unbounded) { continuation in
@@ -72,11 +70,6 @@ public final class AsyncSerialQueue: @unchecked Sendable {
             return
         }
         
-//        // TODO: Is it possible for continuation to not be ready here?
-//        guard !self.executor.isCancelled else {
-//            return
-//        }
-//        
         self._async(closure)
     }
     
@@ -96,19 +89,6 @@ public final class AsyncSerialQueue: @unchecked Sendable {
         case .stopped:
             completion()
         }
-        
-        
-        /*
-        self.state = .stopping
-        
-        if self.executor.isCancelled {
-            newCompletion()
-        } else {
-            Task(priority: self.taskPriority) {
-                await self.cancelBlockList.add(newCompletion)
-            }
-        }
-         */
     }
     
     /// Cancel all queued blocks and prevent additional blocks from being queued.
@@ -124,8 +104,6 @@ public final class AsyncSerialQueue: @unchecked Sendable {
         await self._sync {
             self.state = .stopped
         }
-//        self.executor.cancel()
-//        self.continuation?.finish()
     }
     
     
@@ -156,7 +134,6 @@ public final class AsyncSerialQueue: @unchecked Sendable {
         
         // If we were in the middle of cancelling, try to wait a bit until cancel has completed
         while (Task.isCancelled && self.state != .stopped) {
-            print("  isCancelled: \(Task.isCancelled)  state: \(self.state)")
             try? await Task.sleep(for: .microseconds(delayDurations.next))
 
             if let duration {
@@ -217,7 +194,6 @@ public final class AsyncSerialQueue: @unchecked Sendable {
             
             self.state = .stopped
             
-            await self.cancelBlockList.execute()
             await completion()
         }
     }
