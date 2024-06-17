@@ -14,6 +14,7 @@ var swiftSettings: [SwiftSetting] = [
 let package = Package(
     name: "SwiftAsyncSerialQueue",
     platforms: [ .iOS(.v16), .macOS(.v13), .tvOS(.v16), .watchOS(.v9) ],
+//    platforms: [ .iOS(.v14), .macOS(.v11), .tvOS(.v15), .watchOS(.v8) ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
