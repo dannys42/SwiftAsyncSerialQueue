@@ -10,7 +10,7 @@ import os
 
 /// ``AsyncSerialQueue`` provides behavior similar to serial `DispatchQueue`s while relying solely on Swift concurrency.
 /// In other words, queued async blocks are guaranteed to execute in-order.
-public final class AsyncSerialQueue: @unchecked Sendable {
+public final class AsyncSerialQueueOld: @unchecked Sendable {
     public enum Failures: Error {
         case queueIsCanceled
     }
@@ -33,30 +33,28 @@ public final class AsyncSerialQueue: @unchecked Sendable {
     
     private var _state: OSAllocatedUnfairLock<State>
     
-    private var _currentRunningTasks: OSAllocatedUnfairLock<Set<Task<(), Never>>>
-    private var currentRunningTasks: Set<Task<(), Never>> {
-        get {
-            _currentRunningTasks.withLock { $0 }
-        }
-        set {
-            _currentRunningTasks.withLock { $0 = newValue }
-        }
-    }
-
+    private var taskStream: AsyncStream<closure>!
+    private var continuation: AsyncStream<closure>.Continuation?
+    private var executor: Task<(), Never>!
+    private var currentRunningTask: Task<(), Never>?
+    
     private let taskPriority: TaskPriority?
-    private let executor: Executor
-
+    
     public init(priority: TaskPriority?=nil) {
         self._state = .init(initialState: .setup)
-        self._currentRunningTasks = .init(initialState: [])
         self.taskPriority = priority
+        
+        self.taskStream = AsyncStream<closure>(bufferingPolicy: .unbounded) { [weak self] continuation in
+            guard let self else { return }
 
-        self.executor = Executor(priority: priority) {
-            // completion
-        }
-
-        self.executor.async {
+            self.continuation = continuation
+            
             self.state = .running
+        }
+        self.executor = self.createExecutor() { [weak self] in
+            guard let self else { return }
+            
+            self.state = .stopped
         }
     }
     
@@ -65,33 +63,18 @@ public final class AsyncSerialQueue: @unchecked Sendable {
             self.state = .stopping
         }
         self.executor.cancel()
-        self._currentRunningTasks.withLock({ tasks in
-            tasks.forEach { task in
-                task.cancel()
-            }
-        })
+        self.continuation!.finish()
     }
     
     /// Add a block to the queue
     /// - Parameter closure: Block to execute
     /// If the ``AsyncSerialQueue`` is cancelled, the `closure` will not be queued.
     public func async(_ closure: @escaping closure) {
-        guard [State.running, State.setup].contains(self.state) else {
+        guard self.state == .running else {
             return
         }
         
-        self.executor.async {
-            await closure()
-        } block: { [weak self] state, task in
-            guard let self else { return }
-
-            switch state {
-            case .didQueue:
-                self.currentRunningTasks.insert(task)
-            case .didComplete:
-                self.currentRunningTasks.remove(task)
-            }
-        }
+        self._async(closure)
     }
     
     /// Cancel all queued blocks and prevent additional blocks from being queued.
@@ -99,14 +82,12 @@ public final class AsyncSerialQueue: @unchecked Sendable {
     public func cancel(_ completion: @Sendable @escaping ()->Void = { }) {
         switch self.state {
         case .setup, .running:
-            self.state = .stopping
-            // TODO: cancel running tasks here
-            self.executor.async {
-                self.state = .stopped
+            Task.detached(priority: self.taskPriority) {
+                await self.cancel()
                 completion()
             }
         case .stopping:
-            self.executor.async {
+            self._async {
                 completion()
             }
         case .stopped:
@@ -117,10 +98,15 @@ public final class AsyncSerialQueue: @unchecked Sendable {
     /// Cancel all queued blocks and prevent additional blocks from being queued.
     /// This method will return after all blocks have been cancelled and finished executing.
     public func cancel() async {
-        await withCheckedContinuation { continuation in
-            self.cancel {
-                continuation.resume()
-            }
+        self.currentRunningTask?.cancel()
+        
+        guard self.state == .running else {
+            return
+        }
+        
+        self.state = .stopping
+        await self._sync {
+            self.state = .stopped
         }
     }
     
@@ -132,14 +118,8 @@ public final class AsyncSerialQueue: @unchecked Sendable {
         guard self.state == .running else {
             return
         }
-
-        await withCheckedContinuation { continuation in
-            self.executor.async {
-                await closure()
-
-                continuation.resume()
-            }
-        }
+        
+        await _sync(closure)
     }
     
     /// Wait until all queued blocks have finished executing
@@ -185,6 +165,48 @@ public final class AsyncSerialQueue: @unchecked Sendable {
     
     // MARK: Private Methods
     
+    // Enqueue regardless of state
+    private func _async(_ closure: @escaping closure) {
+        self.continuation!.yield { [weak self] in
+            guard let self else { return }
+
+            await closure()
+//            let task = Task.detached(priority: self.taskPriority) {
+//                await closure()
+//            }
+//            self.currentRunningTask = task
+//            
+//            _ = await task.value
+        }
+    }
+    
+    /// Queue a block, returning only after it has executed
+    /// - Parameter closure: block to queue
+    /// Note: If `AsyncSerialQueue` is cancelled, then `closure` is never executed.
+    public func _sync(_ closure: @escaping closure) async {
+        await withCheckedContinuation { continuation in
+            self._async {
+                await closure()
+                continuation.resume()
+            }
+        }
+    }
+
+
+    private func createExecutor(_ completion: @escaping () async -> Void = {}) -> Task<(), Never> {
+        return Task.detached(priority: self.taskPriority) { [weak self] in
+            guard let self else { return }
+
+            for await closure in self.taskStream {
+                await closure()
+            }
+            
+            self.state = .stopped
+            
+            await completion()
+        }
+    }
+
 }
 
 

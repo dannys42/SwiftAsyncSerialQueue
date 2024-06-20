@@ -1,0 +1,30 @@
+{
+  "configurations" : [
+    {
+      "id" : "F677E124-B4D0-4D4D-BD53-E2902FED0E4F",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "environmentVariableEntries" : [
+      {
+        "enabled" : false,
+        "key" : "RUN_ALL_TESTS",
+        "value" : "1"
+      }
+    ]
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "AsyncSerialQueueTests",
+        "name" : "AsyncSerialQueueTests"
+      }
+    }
+  ],
+  "version" : 1
+}

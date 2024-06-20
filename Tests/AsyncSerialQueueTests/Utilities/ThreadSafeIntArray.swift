@@ -10,7 +10,7 @@ import os
 
 /// A thread-safe helper class to add elements to an array
 class ThreadSafeIntArray: @unchecked Sendable {
-    var someArray = OSAllocatedUnfairLock<[Int]>(initialState: [])
+    private var someArray = OSAllocatedUnfairLock<[Int]>(initialState: [])
 
     func append(_ value: Int) {
         self.someArray.withLock { array in

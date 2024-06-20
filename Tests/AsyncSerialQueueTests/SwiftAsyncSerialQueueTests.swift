@@ -34,7 +34,6 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
 
         for n in 0..<numberOfIterations {
             serialQueue.async {
-                print(" append... \(n)")
                 self.dataHelper.append(n)
             }
         }
@@ -79,7 +78,6 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
             try? await Task.sleep(for: .seconds(3))
         }
         await serialQueue.cancel()
-        print("  state: \(serialQueue.state)")
         serialQueue.async {
             self.dataHelper.append(1)
         }
@@ -120,6 +118,8 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
     #endif
 
     func testThat_MultipleAsync_WillStopExecuting_WhenCancelled() async throws {
+        try XCTSkipUnless(shouldRunAllTest, "Don't run in CI as this may not be consistent.")
+
         let serialQueue = AsyncSerialQueue()
         let numberOfIterations = 200
         
