@@ -10,7 +10,7 @@ import XCTest
 
 final class ExecutorRetainCycleTests: XCTestCase {
 
-//
+
 //    func testThat_UnusedExecutor_HasNoStrongReferences() async throws {
 //        var executor = Executor()
 //
