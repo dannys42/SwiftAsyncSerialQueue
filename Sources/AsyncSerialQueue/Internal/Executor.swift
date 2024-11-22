@@ -16,7 +16,7 @@ class Executor: @unchecked Sendable {
     private var taskStream: AsyncStream<closure>!
     private var continuation: AsyncStream<closure>.Continuation?
 
-    init(priority: TaskPriority?=nil, _ completion: @escaping () async -> Void = {}) {
+    init(priority: TaskPriority?=nil, _ completion: @Sendable @escaping () async -> Void = {}) {
         self.taskPriority = priority
 
         let taskStream = AsyncStream<closure>(bufferingPolicy: .unbounded) { continuation in

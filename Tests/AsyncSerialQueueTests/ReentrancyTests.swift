@@ -9,9 +9,11 @@ import XCTest
 import AsyncSerialQueue
 
 final class ReentrancyTests: XCTestCase {
+
     /// Not checking for order here, just that we're thread-safe
     func testThat_QueueingBlocks_IsThreadSafe() async throws {
-        try XCTSkipUnless(shouldRunAllTest, "Don't run in CI as this can be resource hungry")
+        let shouldRun = await TestConfiguration.shared.shouldRunAllTests()
+        try XCTSkipUnless(shouldRun, "Don't run in CI as this can be resource hungry")
 
         let numberOfThreads = 20
         let numberOfIterations = 10_000

@@ -19,7 +19,7 @@ protocol SimpleLockInterface: Sendable {
 }
 
 @propertyWrapper
-struct SimpleLock<Value>: SimpleLockInterface {
+struct SimpleLock<Value: Sendable>: SimpleLockInterface {
     var wrappedValue: Value {
         get {
             self.withLock({ $0 })
@@ -65,7 +65,7 @@ struct SimpleLock<Value>: SimpleLockInterface {
 
 
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, visionOS 1.0, *)
-final class SimpleUnfairLock<V>: @unchecked Sendable, SimpleLockInterface {
+final class SimpleUnfairLock<V: Sendable>: @unchecked Sendable, SimpleLockInterface {
 
     private var unfairLock: OSAllocatedUnfairLock<V>
     

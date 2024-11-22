@@ -8,7 +8,7 @@
 import Foundation
 import os
 
-class ThreadSafeCounter {
+final class ThreadSafeCounter: @unchecked Sendable {
 
     private var _counter = OSAllocatedUnfairLock(initialState: 0)
 

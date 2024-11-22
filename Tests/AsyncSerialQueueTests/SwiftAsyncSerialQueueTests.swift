@@ -12,11 +12,13 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
         let numberOfIterations = 200
         let expectedValue: [Int] = .sequence(numberOfIterations)
 
+        let dataHelper = self.dataHelper
+
         await withTaskGroup(of: Void.self) { group in
             for n in 0..<numberOfIterations {
                 group.addTask {
                     try? await Task.sleep(nanoseconds: .random(in: 1...100))
-                    self.dataHelper.append(n)
+                    dataHelper.append(n)
                 }
             }
 
@@ -32,9 +34,11 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
 
         let serialQueue = AsyncSerialQueue()
 
+        let dataHelper = self.dataHelper
+
         for n in 0..<numberOfIterations {
             serialQueue.async {
-                self.dataHelper.append(n)
+                dataHelper.append(n)
             }
         }
 
@@ -78,8 +82,10 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
             try? await Task.sleep(for: .seconds(3))
         }
         await serialQueue.cancel()
+
+        let dataHelper = self.dataHelper
         serialQueue.async {
-            self.dataHelper.append(1)
+            dataHelper.append(1)
         }
 
         await serialQueue.wait()
@@ -118,16 +124,19 @@ final class SwiftAsyncSerialQueueTests: XCTestCase {
     #endif
 
     func testThat_MultipleAsync_WillStopExecuting_WhenCancelled() async throws {
-        try XCTSkipUnless(shouldRunAllTest, "Don't run in CI as this may not be consistent.")
+        let shouldRun = await TestConfiguration.shared.shouldRunAllTests()
+        try XCTSkipUnless(shouldRun, "Don't run in CI as this may not be consistent.")
 
         let serialQueue = AsyncSerialQueue()
         let numberOfIterations = 200
-        
+
+        let dataHelper = self.dataHelper
+
         for n in 0..<numberOfIterations {
             Task.detached {
                 try? await Task.sleep(nanoseconds: .random(in: 1_000_000...10_000_000))
                 serialQueue.async {
-                    self.dataHelper.append(n)
+                    dataHelper.append(n)
                 }
             }
         }
