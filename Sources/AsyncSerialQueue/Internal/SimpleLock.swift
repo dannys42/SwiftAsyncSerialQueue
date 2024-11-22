@@ -1,3 +1,4 @@
+#if false
 //
 //  SimpleLock.swift
 //
@@ -105,3 +106,5 @@ final class SimpleLockSemaphore<V>: @unchecked Sendable, SimpleLockInterface {
         return try self.withLockUnchecked(body)
     }
 }
+
+#endif
