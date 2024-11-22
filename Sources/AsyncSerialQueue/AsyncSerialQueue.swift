@@ -20,6 +20,10 @@ public final class AsyncSerialQueue: @unchecked Sendable {
         case running
         case stopping
         case stopped
+
+        var isRunning: Bool {
+            self == .setup || self == .running
+        }
     }
     public typealias closure = @Sendable () async -> Void
     public private(set) var state: State {
@@ -76,7 +80,7 @@ public final class AsyncSerialQueue: @unchecked Sendable {
     /// - Parameter closure: Block to execute
     /// If the ``AsyncSerialQueue`` is cancelled, the `closure` will not be queued.
     public func async(_ closure: @escaping closure) {
-        guard [State.running, State.setup].contains(self.state) else {
+        guard self.state.isRunning else {
             return
         }
         
@@ -129,7 +133,7 @@ public final class AsyncSerialQueue: @unchecked Sendable {
     /// - Parameter closure: block to queue
     /// Note: If `AsyncSerialQueue` is cancelled, then `closure` is never executed.
     public func sync(_ closure: @escaping closure) async {
-        guard self.state == .running else {
+        guard self.state.isRunning else {
             return
         }
 
