@@ -13,6 +13,7 @@ import os
 public final class AsyncSerialQueue: @unchecked Sendable {
     public enum Failures: Error {
         case queueIsCanceled
+        case queueIsNotRunning
     }
     
     public enum State: Sendable {
@@ -145,7 +146,31 @@ public final class AsyncSerialQueue: @unchecked Sendable {
             }
         }
     }
-    
+
+    /// Queue a block, returning only after it has executed
+    /// - Parameter closure: block to queue
+    /// Note: If `AsyncSerialQueue` is cancelled, then `closure` is never executed.
+    /// - Returns: Result of closure
+    /// - Throws: ``Failures/queueIsNotRunning`` if queue is not in a running state.
+    public func sync<T>(_ closure: @escaping @Sendable () async throws -> T) async throws -> T {
+        guard self.state.isRunning else {
+            throw Failures.queueIsNotRunning
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            self.executor.async {
+                do {
+                    let result = try await closure()
+
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+
+            }
+        }
+    }
+
     /// Wait until all queued blocks have finished executing
     @discardableResult
     public func wait<C>(for duration: C.Instant.Duration?=nil, tolerance: C.Instant.Duration? = nil, clock: C = ContinuousClock()) async -> State where C : Clock {
