@@ -50,8 +50,10 @@ public final class AsyncSerialQueue: @unchecked Sendable {
 
     private let taskPriority: TaskPriority?
     private let executor: Executor
+    public let label: String?
 
-    public init(priority: TaskPriority?=nil) {
+    public init(label: String?=nil, priority: TaskPriority?=nil) {
+        self.label = label
         self._state = .init(initialState: .setup)
         self._currentRunningTasks = .init(initialState: [])
         self.taskPriority = priority
