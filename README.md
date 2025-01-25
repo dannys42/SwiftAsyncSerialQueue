@@ -6,10 +6,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 
-AsyncSerialQueue is a simple library to provide [serial queue](https://www.avanderlee.com/swift/concurrent-serial-dispatchqueue/)-like capability using [Swift Concurrency](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/).  Tasks placed in an AsyncSerialQueue are guaranteed to execute sequentially.
+`AsyncSerialQueue` is a library provides some useful patterns using Swift Concurrency:
+
+`AsyncSerialQueue` is a class provides [serial queue](https://www.avanderlee.com/swift/concurrent-serial-dispatchqueue/)-like capability using [Swift Concurrency](https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/).  Tasks placed in an `AsyncSerialQueue` are guaranteed to execute sequentially.
+
+`AsyncCoalescingQueue` is a companion class that has properties similar to [DispatchSource](https://www.mikeash.com/pyblog/friday-qa-2009-09-11-intro-to-grand-central-dispatch-part-iii-dispatch-sources.html).
 
 AsyncSerialQueue is currently only available on Apple platforms (i.e. not on Linux).  This is because of the need for locking and Swift [currently does not have a standard cross-platform locking mechnism](https://forums.swift.org/t/shared-mutable-state-sendable-and-locks/64336).
 
+
+# `AsyncSerialQueue`
 
 ## Example
 
@@ -100,3 +106,42 @@ func example() async {
 
 In this case, `apple` will never appear before `2`.  And `example()` will not return until `2` is printed.
 
+
+# `AsyncCoalescingQueue`
+
+## Example
+
+The following code:
+
+```swift
+let coalescingQueue = AsyncCoalescingQueue()
+
+coalescingQueue.run {
+    try? await Task.sleep(for: .seconds(5))
+    print("Run 1")
+}
+coalescingQueue.run {
+    try? await Task.sleep(for: .seconds(5))
+    print("Run 2")
+}
+coalescingQueue.run {
+    try? await Task.sleep(for: .seconds(5))
+    print("Run 3")
+}
+coalescingQueue.run {
+    try? await Task.sleep(for: .seconds(5))
+    print("Run 4")
+}
+coalescingQueue.run {
+    try? await Task.sleep(for: .seconds(5))
+    print("Run 5")
+}
+```
+Will output the following:
+
+```
+Run 1
+Run 5
+```
+
+And take 10 seconds to complete executing.

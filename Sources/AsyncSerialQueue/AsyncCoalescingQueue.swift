@@ -8,7 +8,22 @@
 import Foundation
 import os
 
-/// Provides behavior similar to DispatchSource using Swift Concurrency
+/// ``AsyncCoalescingQueue`` provides behavior similar to DispatchSource using Swift Concurrency
+/// When the queue is idle, the first task queued is guaranteed to run.  Subsequent tasks will only execute when the queue is idle.  If more the one task is pending execution, only the last one will execute.
+///
+/// For example, if executing:
+/// ```swift
+///   let coalescingQueue = AsyncCoalescingQueue()
+///   coalescingQueue.run { await slowFunction(1) }
+///   coalescingQueue.run { await slowFunction(2) }
+///   coalescingQueue.run { await slowFunction(3) }
+///   coalescingQueue.run { await slowFunction(4) }
+/// ```
+/// This is equivalent to:
+/// ```swift
+///     await slowFunction(1)
+///     await slowFunction(4)
+/// ```
 public class AsyncCoalescingQueue: @unchecked Sendable {
     public let label: String?
     private let serialQueue: AsyncSerialQueue
@@ -16,14 +31,19 @@ public class AsyncCoalescingQueue: @unchecked Sendable {
     private let taskList = TaskList()
     private let priority: TaskPriority?
 
+    /// Initialize a new ``AsyncCoalescingQueue`` instance
+    /// - Parameters:
+    ///   - label: An optional string that can be used to identify the queue
+    ///   - priority: Optional ``TaskPriority`` used when executing tasks
     public init(label: String? = nil, priority: TaskPriority? = nil) {
         self.label = label
         self.priority = priority
         self.serialQueue = AsyncSerialQueue(label: label, priority: priority)
     }
-    
+
     /// Attempt to execute a given block.
-    /// Will not attempt to execute more than 2 in-flight blocks.
+    /// The block will not be executed if a new block is queued before it runs.
+    /// Subsequent blocks are guaranteed to not run at the same time.
     /// - Parameter block: block to execute
     public func run(_ block: @escaping () async -> Void) {
         self.serialQueue.async {
@@ -34,6 +54,7 @@ public class AsyncCoalescingQueue: @unchecked Sendable {
         }
     }
 
+    /// Wait for all pending blocks to execute.
     public func wait() async {
         await self.serialQueue.sync {
             while await self.taskList.isEmpty == false {
@@ -42,14 +63,18 @@ public class AsyncCoalescingQueue: @unchecked Sendable {
             }
         }
     }
+}
 
-    private func triggerProcessNextTask() {
+// MARK: - Private
+fileprivate extension AsyncCoalescingQueue {
+
+    func triggerProcessNextTask() {
         Task(priority: self.priority) {
             await self.processNextTask()
         }
     }
 
-    private func processNextTask() async {
+    func processNextTask() async {
         if await self.taskList.isAnyTaskRunning {
             return
         }
@@ -62,7 +87,7 @@ public class AsyncCoalescingQueue: @unchecked Sendable {
         case .running:
             break
         case .waiting:
-            Task {
+            Task(priority: self.priority) {
                 await task.run()
 
                 await self.processNextTask()
