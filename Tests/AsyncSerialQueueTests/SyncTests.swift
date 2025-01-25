@@ -32,14 +32,12 @@ func syncWillThrowValue() async throws {
     }
 
     let queue = AsyncSerialQueue()
-    let inputValue = "Hello, World!"
 
     await #expect(throws: Failures.failure1) {
         try await queue.sync {
             try await Task.sleep(for: .milliseconds(10))
 
             throw Failures.failure1
-            return inputValue
         }
     }
 }
