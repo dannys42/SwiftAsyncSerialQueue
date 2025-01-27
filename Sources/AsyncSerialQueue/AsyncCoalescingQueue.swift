@@ -50,7 +50,9 @@ public class AsyncCoalescingQueue: @unchecked Sendable {
             let taskBox = TaskBox(block)
             await self.taskList.upsertTask(taskBox)
 
-            self.triggerProcessNextTask()
+            if await self.taskList.isAnyTaskRunning == false {
+                self.triggerProcessNextTask()
+            }
         }
     }
 
@@ -58,7 +60,6 @@ public class AsyncCoalescingQueue: @unchecked Sendable {
     public func wait() async {
         await self.serialQueue.sync {
             while await self.taskList.isEmpty == false {
-                await self.processNextTask()
                 try? await Task.sleep(for: .milliseconds(10))
             }
         }
@@ -75,11 +76,11 @@ fileprivate extension AsyncCoalescingQueue {
     }
 
     func processNextTask() async {
-        if await self.taskList.isAnyTaskRunning {
+        guard let task = await self.taskList.firstTask else {
             return
         }
 
-        guard let task = await self.taskList.firstTask else {
+        if await self.taskList.isAnyTaskRunning {
             return
         }
 
@@ -95,12 +96,19 @@ fileprivate extension AsyncCoalescingQueue {
 
         case .complete:
             await self.taskList.removeTask(task)
+            await self.taskList.removeAllButLastTask()
+            self.triggerProcessNextTask()
+
         }
     }
 }
 
 fileprivate actor TaskList: Sendable {
     private var tasks: [TaskBox] = []
+
+    var count: Int {
+        tasks.count
+    }
 
     var isEmpty: Bool {
         self.tasks.isEmpty
@@ -129,6 +137,12 @@ fileprivate actor TaskList: Sendable {
         }
 
         self.tasks.append(task)
+    }
+
+    func removeAllButLastTask() {
+        if let lastTask = self.tasks.last {
+            self.tasks = [ lastTask ]
+        }
     }
 
     func removeTask(_ task: TaskBox) {

@@ -1,3 +1,4 @@
+#if canImport(Testing)
 //
 //  CoalescingQueueTests.swift
 //  SwiftAsyncSerialQueue
@@ -11,7 +12,67 @@ import Testing
 
 struct CoalescingQueueTests {
 
-    @Test func testThat_DelayedTasks_WillCoalesce() async throws {
+    @Test("Executing 1 run will execute")
+    func testThat_OneRun_WillExecuteOnce() async throws {
+        let coalescingQueue = AsyncCoalescingQueue()
+        var value: Int = 0
+        
+        coalescingQueue.run {
+            value += 1
+        }
+
+        await coalescingQueue.wait()
+
+        #expect(value == 1)
+    }
+
+    @Test("Executing 2 runs will execute both")
+    func testThat_TwoRuns_WillExecuteTwo() async throws {
+        let coalescingQueue = AsyncCoalescingQueue()
+        var observedValues: [String] = []
+        let expectedValues = [ "one", "two" ]
+
+
+        coalescingQueue.run {
+            observedValues.append("one")
+        }
+        coalescingQueue.run {
+            observedValues.append("two")
+        }
+
+        await coalescingQueue.wait()
+
+        #expect(observedValues == expectedValues)
+    }
+
+    @Test("Executing 3 long running tasks, only execute the first and last")
+    func testThat_ThreeRuns_WillExecuteTwo() async throws {
+        let coalescingQueue = AsyncCoalescingQueue()
+        var observedValues: [String] = []
+        let expectedValues = [ "one", "three" ]
+
+
+        coalescingQueue.run {
+            observedValues.append("one")
+            try? await Task.sleep(for: .seconds(1))
+        }
+        coalescingQueue.run {
+            observedValues.append("two")
+            try? await Task.sleep(for: .seconds(2))
+        }
+        coalescingQueue.run {
+            observedValues.append("three")
+            try? await Task.sleep(for: .seconds(2))
+        }
+
+        await coalescingQueue.wait()
+
+        #expect(observedValues == expectedValues)
+
+    }
+
+    @Test("Executing many long running tasks, only the first and last one should run")
+    func testThat_ManyRuns_WillExecuteTwo() async throws {
         let coalescingQueue = AsyncCoalescingQueue()
         var value: Int = 0
         let numberOfIterations = 20
@@ -58,3 +119,5 @@ struct CoalescingQueueTests {
     }
 
 }
+
+#endif
