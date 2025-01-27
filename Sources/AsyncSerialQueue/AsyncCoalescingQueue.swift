@@ -31,6 +31,12 @@ public class AsyncCoalescingQueue: @unchecked Sendable {
     private let taskList = TaskList()
     private let priority: TaskPriority?
 
+    public enum TimeOutResult {
+        case timedOut
+        case completed
+        case canceled
+    }
+
     /// Initialize a new ``AsyncCoalescingQueue`` instance
     /// - Parameters:
     ///   - label: An optional string that can be used to identify the queue
@@ -57,11 +63,27 @@ public class AsyncCoalescingQueue: @unchecked Sendable {
     }
 
     /// Wait for all pending blocks to execute.
-    public func wait() async {
-        await self.serialQueue.sync {
-            while await self.taskList.isEmpty == false {
-                try? await Task.sleep(for: .milliseconds(10))
+    @discardableResult
+    public func wait<C>(timeout: C.Instant.Duration? = nil, clock: C = ContinuousClock()) async -> TimeOutResult where C: Clock {
+        let minSleepMilliseconds = 125
+
+        let start = clock.now
+        do {
+            return try await self.serialQueue.sync {
+                while await self.taskList.isEmpty == false {
+                    try await Task.sleep(for: .milliseconds(minSleepMilliseconds))
+
+                    if let timeout {
+                        let current = clock.now
+                        if start.duration(to: current) >= timeout {
+                            return TimeOutResult.timedOut
+                        }
+                    }
+                }
+                return TimeOutResult.completed
             }
+        } catch {
+            return .canceled
         }
     }
 }

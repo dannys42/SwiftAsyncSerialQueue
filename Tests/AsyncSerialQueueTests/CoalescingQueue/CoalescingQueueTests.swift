@@ -23,6 +23,8 @@ struct CoalescingQueueTests {
 
         await coalescingQueue.wait()
 
+
+
         #expect(value == 1)
     }
 
@@ -106,7 +108,8 @@ struct CoalescingQueueTests {
             }
         }
 
-        await coalescingQueue.wait()
+        let waitResult = await coalescingQueue.wait(timeout: .seconds(5))
+        #expect(waitResult == .completed)
 
         let endTime = Date.now
 
