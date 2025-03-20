@@ -145,3 +145,10 @@ Run 5
 ```
 
 And take 10 seconds to complete executing.
+
+
+# Alternatives
+
+* [swift-async-queue](https://github.com/dfed/swift-async-queue)
+* [Queue](https://github.com/mattmassicotte/Queue)
+* [Semaphore](https://github.com/groue/Semaphore)
