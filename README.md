@@ -109,6 +109,9 @@ In this case, `apple` will never appear before `2`.  And `example()` will not re
 
 # `AsyncCoalescingQueue`
 
+[Coalescing Queues](https://www.mikeash.com/pyblog/friday-qa-2009-09-11-intro-to-grand-central-dispatch-part-iii-dispatch-sources.html) can be a useful technique especially in flows where you only care about the first and last event, but would like to drop interim events if processing is still in play.  For example when processing user input, perhaps you want the first event in order to kick off processing and provide user immediate feedback, and you also want the last event because that represents the most up-to-date user state requested.  For example, consider a scrubber for an audio player.
+
+
 ## Example
 
 The following code:
@@ -152,3 +155,4 @@ And take 10 seconds to complete executing.
 * [swift-async-queue](https://github.com/dfed/swift-async-queue)
 * [Queue](https://github.com/mattmassicotte/Queue)
 * [Semaphore](https://github.com/groue/Semaphore)
+
