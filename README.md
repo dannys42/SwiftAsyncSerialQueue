@@ -111,6 +111,9 @@ In this case, `apple` will never appear before `2`.  And `example()` will not re
 
 [Coalescing Queues](https://www.mikeash.com/pyblog/friday-qa-2009-09-11-intro-to-grand-central-dispatch-part-iii-dispatch-sources.html) can be a useful technique especially in flows where you only care about the first and last event, but would like to drop interim events if processing is still in play.  For example when processing user input, perhaps you want the first event in order to kick off processing and provide user immediate feedback, and you also want the last event because that represents the most up-to-date user state requested.  For example, consider a scrubber for an audio player.
 
+In the GCD approach, coalescing queues acted on a trigger but could not take input very easily.  In this Swift implementation, the API is kept simply by relying on scoped variables at the point of call.  However, if there are multiple `.run()` blocks, make sure that it is acceptable for any of them to get dropped.  If multiple `.run()` blocks are required, consider placing the common code in a separate function that is called within the multiple `.run()` blocks.  Also consider whether multiple `AsyncCoalescingQueue()` instances or `AsyncSerialQueue()` may be a better fit.
+
+`AsyncCoalescingQueue` is somewhat similar to `debounce` and `throttle` in Combine.  `debounce` has a fixed lag before the first event is emitted, requiring an additional `Concatenate` publisher if you do not wish to miss the first event.  `throttle` works on fixed time intervals, but may require tuning to balance the task with the speed of the hardware.  In some UI cases, you may wish to provide "best effort" responsiveness to the user.  `AsyncCoalescingQueue` (like GCD coalescing queues) will ensure responsiveness by automatically scaling to the workload and hardware it is running on.
 
 ## Example
 
@@ -152,7 +155,8 @@ And take 10 seconds to complete executing.
 
 # Alternatives
 
+Some related libraries:
+
 * [swift-async-queue](https://github.com/dfed/swift-async-queue)
 * [Queue](https://github.com/mattmassicotte/Queue)
 * [Semaphore](https://github.com/groue/Semaphore)
-
