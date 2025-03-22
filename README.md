@@ -160,3 +160,8 @@ Some related libraries:
 * [swift-async-queue](https://github.com/dfed/swift-async-queue)
 * [Queue](https://github.com/mattmassicotte/Queue)
 * [Semaphore](https://github.com/groue/Semaphore)
+
+# References
+* [GCD: Coalescing Dispatch Queues](https://www.mikeash.com/pyblog/friday-qa-2009-09-11-intro-to-grand-central-dispatch-part-iii-dispatch-sources.html) 
+* [Stack Overflow: Combine debounce and throttle ](https://stackoverflow.com/questions/60295544/how-do-you-apply-a-combine-operator-only-after-the-first-message-has-been-receiv)
+
